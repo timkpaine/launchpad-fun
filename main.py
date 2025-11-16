@@ -64,10 +64,7 @@ def process_audio(audio_buffer):
     SPECTRUM_BANDS[:] = values // NORMALIZATION_FACTOR
 
 
-def update_launchpad():
-    lpx = lp.LaunchpadLPX()
-    lpx.Open(1, "lpx")
-    lpx.LedAllOn(0)
+def update_launchpad(lp):
     width = 9
     height = 9
     colors = np.array(
@@ -97,9 +94,9 @@ def update_launchpad():
         changed_off = ~lit_mask & prev_mask
         for li, bi in np.argwhere(changed_on):
             r, g, b = colors[bi]
-            lpx.LedCtrlRaw(int(button_numbers[li, bi]), int(r), int(g), int(b))
+            lp.LedCtrlRaw(int(button_numbers[li, bi]), int(r), int(g), int(b))
         for li, bi in np.argwhere(changed_off):
-            lpx.LedCtrlRaw(int(button_numbers[li, bi]), 0, 0, 0)
+            lp.LedCtrlRaw(int(button_numbers[li, bi]), 0, 0, 0)
         prev_mask = lit_mask
 
 
@@ -114,10 +111,7 @@ def detect(p):
     return bh
 
 
-def main():
-    p = pyaudio.PyAudio()
-
-    # Open input stream from BlackHole
+def stream_audio(p):
     stream = p.open(
         format=FORMAT,
         channels=CHANNELS,
@@ -127,13 +121,27 @@ def main():
         frames_per_buffer=CHUNK,
     )
 
-    Thread(target=update_launchpad, daemon=True).start()
     while True:
         data = stream.read(CHUNK)
         process_audio(data)
-    # stream.stop_stream()
-    # stream.close()
-    # p.terminate()
+
+
+def main():
+    lpx = lp.LaunchpadLPX()
+    lpx.Open(1, "lpx")
+    lpx.LedAllOn(0)
+    Thread(target=update_launchpad, args=(lpx,), daemon=True).start()
+    p = pyaudio.PyAudio()
+
+    while True:
+        try:
+            stream_audio(p)
+        except KeyboardInterrupt:
+            p.terminate()
+            lpx.Reset()
+            break
+        except OSError:
+            print("Audio Stream Error - Reinitializing...")
 
 
 if __name__ == "__main__":
