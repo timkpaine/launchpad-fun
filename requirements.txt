@@ -1,0 +1,4 @@
+launchpad_py
+numpy
+pyaudio
+pygame-ce
